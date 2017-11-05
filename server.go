@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/msiebuhr/httperror"
 )
@@ -50,16 +51,28 @@ func (s Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	// TODO: Update device's info with new data
 	//info = s.store.GetDeviceInfo(mac);
 
-	info := map[string]interface{}{}
+	// Record the requests circumstances
+	info := map[string]interface{}{
+		"remoteAddr": req.RemoteAddr,
+		"time":       time.Now().UTC(),
+	}
+	deviceInfo := map[string]interface{}{}
 	for name, values := range req.Header {
 		if strings.HasPrefix(name, "X-Esp8266-") {
 			info[name[len("X-Esp8266-"):]] = values[0]
+			deviceInfo[name[len("X-Esp8266-"):]] = values[0]
 		}
 	}
-	s.store.LogDeviceRequest(mac, info)
+
+	s.store.LogDeviceInfo(mac, deviceInfo)
+	defer s.store.LogDeviceRequest(mac, info)
+
+	// TODO: Some clever way of tracking how we exit'ed
 
 	desiredMD5, err := s.store.GetDeviceSketchMD5(mac)
 	if err != nil {
+		info["err"] = err.Error()
+
 		if herr, ok := httperror.IsHTTPError(err); ok {
 			herr.Respond(w)
 			return
@@ -70,23 +83,34 @@ func (s Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	if bytes.Equal(desiredMD5, []byte{}) {
+		info["err"] = "Unknown device"
+		info["code"] = http.StatusBadRequest
+
 		http.Error(w, "Unknown device", http.StatusBadRequest)
 		return
 	}
 
 	// If the received MD5 matches the stored one, do nothing
 	if bytes.Equal(desiredMD5, md5) {
+		info["err"] = "Nothing changed"
+		info["code"] = http.StatusNotModified
+
 		w.WriteHeader(http.StatusNotModified)
 		return
 	}
 
 	sketch, err := s.store.GetDeviceSketch(mac)
 	if err != nil {
+		info["err"] = "Could not fetch sketch"
+		info["code"] = http.StatusInternalServerError
 		http.Error(w, "Could not fetch sketch", http.StatusInternalServerError)
 		return
 	}
 
 	// Update 'a-comin
+	info["err"] = "Sketch updated to " + hex.EncodeToString(desiredMD5)
+	info["code"] = http.StatusOK
+
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Content-Length", strconv.Itoa(len(sketch)))
 	//w.Header().Set("Content-Disposition", "attachment; filename='sketch.bin'")
@@ -95,7 +119,6 @@ func (s Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.Header()["x-MD5"] = []string{hex.EncodeToString(desiredMD5)}
 	w.WriteHeader(http.StatusOK)
 
-	count, err := w.Write(sketch)
-	fmt.Println("Wrote", count, err)
+	w.Write(sketch)
 	req.Body.Close() // We're not gonna use that
 }

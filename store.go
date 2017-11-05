@@ -17,16 +17,17 @@ import (
 // TODO(msiebuhr): What about unknown devices?
 
 type Store interface {
+	LogDeviceInfo(net.HardwareAddr, map[string]interface{}) error
 	LogDeviceRequest(net.HardwareAddr, map[string]interface{}) error
-	//GetDeviceInfo(net.HardwareAddr) (map[string]string, error)
 	GetDeviceSketchMD5(net.HardwareAddr) ([]byte, error)
 	GetDeviceSketch(net.HardwareAddr) ([]byte, error)
 }
 
 // MemoryStore is a Store-implementation in memory.
 type memoryStoreDevice struct {
-	info   map[string]interface{}
-	sketch []byte
+	info     map[string]interface{}
+	requests []map[string]interface{}
+	sketch   []byte
 }
 type MemoryStore map[string]*memoryStoreDevice
 
@@ -36,12 +37,13 @@ func NewMemoryStore() MemoryStore {
 
 func (ms MemoryStore) AddDevice(addr net.HardwareAddr, sketch []byte) {
 	ms[addr.String()] = &memoryStoreDevice{
-		info:   make(map[string]interface{}),
-		sketch: sketch,
+		info:     make(map[string]interface{}),
+		requests: make([]map[string]interface{}, 0),
+		sketch:   sketch,
 	}
 }
 
-func (ms MemoryStore) LogDeviceRequest(addr net.HardwareAddr, info map[string]interface{}) error {
+func (ms MemoryStore) LogDeviceInfo(addr net.HardwareAddr, info map[string]interface{}) error {
 	if data, ok := ms[addr.String()]; ok {
 		data.info = info
 		return nil
@@ -50,6 +52,21 @@ func (ms MemoryStore) LogDeviceRequest(addr net.HardwareAddr, info map[string]in
 	ms[addr.String()] = &memoryStoreDevice{
 		info:   info,
 		sketch: []byte{},
+	}
+
+	return nil
+}
+
+func (ms MemoryStore) LogDeviceRequest(addr net.HardwareAddr, info map[string]interface{}) error {
+	if data, ok := ms[addr.String()]; ok {
+		data.requests = append(data.requests, info)
+		return nil
+	}
+
+	ms[addr.String()] = &memoryStoreDevice{
+	//info: make(map[string]interface{})
+	//requests: []map[string]interface{}{info}
+	//sketch: []byte{},
 	}
 
 	return nil

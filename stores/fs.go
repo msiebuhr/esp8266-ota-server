@@ -2,13 +2,13 @@ package stores
 
 import (
 	"crypto/md5"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
 	"strings"
-	"encoding/json"
 
 	"github.com/msiebuhr/httperror"
 )
@@ -53,9 +53,44 @@ func (fs *FileSystem) AddDevice(addr net.HardwareAddr, sketch []byte) {
 	}
 }
 
+func (fs *FileSystem) LogDeviceInfo(addr net.HardwareAddr, info map[string]interface{}) error {
+	// Create required directories
+	infoPath := filepath.Clean(filepath.Join(fs.root, "devices", addr.String(), "info.json"))
+
+	if !strings.HasPrefix(infoPath, fs.root) {
+		return httperror.NewBadRequest("Invalid path")
+	}
+
+	err := os.MkdirAll(filepath.Dir(infoPath), 0644)
+	if err != nil {
+		return err
+	}
+
+	// JSON encode data
+	jsonData, err := json.Marshal(info)
+	if err != nil {
+		return err
+	}
+
+	// If the file doesn't exist, create it, or append to the file
+	f, err := os.Create(infoPath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	if _, err := f.Write(jsonData); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (fs *FileSystem) LogDeviceRequest(addr net.HardwareAddr, info map[string]interface{}) error {
 	// Create required directories
 	logPath := filepath.Clean(filepath.Join(fs.root, "devices", addr.String(), "request.log"))
+
+	if !strings.HasPrefix(logPath, fs.root) {
+		return httperror.NewBadRequest("Invalid path")
+	}
 
 	err := os.MkdirAll(filepath.Dir(logPath), 0644)
 	if err != nil {
@@ -97,7 +132,8 @@ func (fs *FileSystem) GetDeviceSketchMD5(addr net.HardwareAddr) ([]byte, error) 
 func (fs *FileSystem) GetDeviceSketch(addr net.HardwareAddr) ([]byte, error) {
 	// Does the device exist?
 	hwPath := filepath.Clean(filepath.Join(fs.root, "devices", addr.String(), "sketch", "active.bin"))
-	if !strings.HasPrefix(fs.root, hwPath) {
+	if !strings.HasPrefix(hwPath, fs.root) {
+		fmt.Println(fs.root, hwPath)
 		return []byte{}, httperror.NewBadRequest("Invalid path")
 	}
 
