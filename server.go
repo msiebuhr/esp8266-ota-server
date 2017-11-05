@@ -9,9 +9,13 @@ package esp8266ota
 import (
 	"bytes"
 	"encoding/hex"
-	"io"
+	"fmt"
 	"net"
 	"net/http"
+	"strconv"
+	"strings"
+
+	"github.com/msiebuhr/httperror"
 )
 
 type Handler struct {
@@ -25,8 +29,6 @@ func NewHandler(s Store) Handler {
 }
 
 func (s Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	req.Body.Close() // We're not gonna use that
-
 	macStrs, ok := req.Header["X-Esp8266-Sta-Mac"] // Correct name?
 	if !ok || len(macStrs) != 1 {
 		http.Error(w, "One `X-ESP8266-STA-MAC` header required", http.StatusBadRequest)
@@ -43,11 +45,29 @@ func (s Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		panic(err)
 	}
+	fmt.Println("Got MAC", mac, "md5", hex.EncodeToString(md5))
 
 	// TODO: Update device's info with new data
 	//info = s.store.GetDeviceInfo(mac);
 
-	desiredMD5 := s.store.GetDeviceSketchMD5(mac)
+	info := map[string]interface{}{}
+	for name, values := range req.Header {
+		if strings.HasPrefix(name, "X-Esp8266-") {
+			info[name[len("X-Esp8266-"):]] = values[0]
+		}
+	}
+	s.store.LogDeviceRequest(mac, info)
+
+	desiredMD5, err := s.store.GetDeviceSketchMD5(mac)
+	if err != nil {
+		if herr, ok := httperror.IsHTTPError(err); ok {
+			herr.Respond(w)
+			return
+		} else {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
 
 	if bytes.Equal(desiredMD5, []byte{}) {
 		http.Error(w, "Unknown device", http.StatusBadRequest)
@@ -60,12 +80,22 @@ func (s Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Update 'a-comin
-	w.WriteHeader(http.StatusOK)
-	w.Header().Set("Content-Type", "application/octet-stream")
-	w.Header().Set("Content-Disposition", "attachment; filename='sketch.bin'")
-	//w.Header().Set("Content-Length", <How much GetDeviceSketch() returned)
-	w.Header().Set("x-MD5", string(desiredMD5))
+	sketch, err := s.store.GetDeviceSketch(mac)
+	if err != nil {
+		http.Error(w, "Could not fetch sketch", http.StatusInternalServerError)
+		return
+	}
 
-	io.Copy(w, s.store.GetDeviceSketch(mac))
+	// Update 'a-comin
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Length", strconv.Itoa(len(sketch)))
+	//w.Header().Set("Content-Disposition", "attachment; filename='sketch.bin'")
+	//w.Header().Set("x-MD5", hex.EncodeToString(desiredMD5))
+	// Write `x-MD5`-header without having it passed through normalization
+	w.Header()["x-MD5"] = []string{hex.EncodeToString(desiredMD5)}
+	w.WriteHeader(http.StatusOK)
+
+	count, err := w.Write(sketch)
+	fmt.Println("Wrote", count, err)
+	req.Body.Close() // We're not gonna use that
 }

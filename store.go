@@ -1,10 +1,10 @@
 package esp8266ota
 
 import (
-	"bytes"
 	"crypto/md5"
-	"io"
 	"net"
+
+	"github.com/msiebuhr/httperror"
 )
 
 // Stores allow for accessing device-specific information and information
@@ -17,15 +17,15 @@ import (
 // TODO(msiebuhr): What about unknown devices?
 
 type Store interface {
-	//SetDeviceInfo(net.HardwareAddr, map[string]string)
-	GetDeviceInfo(net.HardwareAddr) map[string]string
-	GetDeviceSketchMD5(net.HardwareAddr) []byte
-	GetDeviceSketch(net.HardwareAddr) io.Reader
+	LogDeviceRequest(net.HardwareAddr, map[string]interface{}) error
+	//GetDeviceInfo(net.HardwareAddr) (map[string]string, error)
+	GetDeviceSketchMD5(net.HardwareAddr) ([]byte, error)
+	GetDeviceSketch(net.HardwareAddr) ([]byte, error)
 }
 
 // MemoryStore is a Store-implementation in memory.
 type memoryStoreDevice struct {
-	info   map[string]string
+	info   map[string]interface{}
 	sketch []byte
 }
 type MemoryStore map[string]*memoryStoreDevice
@@ -36,32 +36,37 @@ func NewMemoryStore() MemoryStore {
 
 func (ms MemoryStore) AddDevice(addr net.HardwareAddr, sketch []byte) {
 	ms[addr.String()] = &memoryStoreDevice{
-		info:   make(map[string]string),
+		info:   make(map[string]interface{}),
 		sketch: sketch,
 	}
 }
 
-func (ms MemoryStore) GetDeviceInfo(addr net.HardwareAddr) map[string]string {
+func (ms MemoryStore) LogDeviceRequest(addr net.HardwareAddr, info map[string]interface{}) error {
 	if data, ok := ms[addr.String()]; ok {
-		return data.info
+		data.info = info
+		return nil
 	}
 
-	// TODO: Something better than an empty map...
-	return make(map[string]string, 0)
-}
-
-func (ms MemoryStore) GetDeviceSketch(addr net.HardwareAddr) io.Reader {
-	if data, ok := ms[addr.String()]; ok {
-		return bytes.NewReader(data.sketch)
+	ms[addr.String()] = &memoryStoreDevice{
+		info:   info,
+		sketch: []byte{},
 	}
-	return bytes.NewReader([]byte{})
+
+	return nil
 }
 
-func (ms MemoryStore) GetDeviceSketchMD5(addr net.HardwareAddr) []byte {
+func (ms MemoryStore) GetDeviceSketch(addr net.HardwareAddr) ([]byte, error) {
+	if data, ok := ms[addr.String()]; ok {
+		return data.sketch, nil
+	}
+	return nil, httperror.NewNotFound()
+}
+
+func (ms MemoryStore) GetDeviceSketchMD5(addr net.HardwareAddr) ([]byte, error) {
 	if data, ok := ms[addr.String()]; ok {
 		hash := md5.Sum(data.sketch)
-		return hash[:]
+		return hash[:], nil
 
 	}
-	return []byte{} // Zero array!?
+	return nil, httperror.NewNotFound()
 }
