@@ -50,16 +50,16 @@ func fillMemoryStore(store esp8266ota.MemoryStore) {
 
 func main() {
 	/*
-	store := esp8266ota.NewMemoryStore()
-	// Add dummy device
-	mac, err := net.ParseMAC("18:FE:AA:AA:AA:AA")
-	if err != nil {
-		panic(err)
-	}
-	store.AddDevice(mac, []byte("foobar"))
+		store := esp8266ota.NewMemoryStore()
+		// Add dummy device
+		mac, err := net.ParseMAC("18:FE:AA:AA:AA:AA")
+		if err != nil {
+			panic(err)
+		}
+		store.AddDevice(mac, []byte("foobar"))
 
-	// Add other deivces from arguments w. [<MAC> <image_name> [<MAC2> <image_name2> [...]]]
-	fillStoreFromArguments(store)
+		// Add other deivces from arguments w. [<MAC> <image_name> [<MAC2> <image_name2> [...]]]
+		fillStoreFromArguments(store)
 	*/
 
 	store, err := stores.NewFileSystem("./data")
