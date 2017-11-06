@@ -24,6 +24,19 @@ type FileSystem struct {
 	root string
 }
 
+// Creates the needed directories for the device and retunrs the base
+// string.
+func (fs FileSystem) ensureDeviceExist(addr net.HardwareAddr) (string, error) {
+	devicePath := filepath.Clean(filepath.Join(fs.root, "devices", addr.String()))
+
+	if !strings.HasPrefix(devicePath, fs.root) {
+		return "", httperror.NewBadRequest("Invalid path")
+	}
+
+	err := os.MkdirAll(devicePath, 0644)
+	return devicePath, err
+}
+
 func NewFileSystem(root string) (*FileSystem, error) {
 	// TODO: Check root exists
 	abspath, err := filepath.Abs(root)
@@ -39,17 +52,13 @@ func NewFileSystem(root string) (*FileSystem, error) {
 }
 
 func (fs *FileSystem) LogDeviceInfo(addr net.HardwareAddr, info map[string]interface{}) error {
-	// Create required directories
-	infoPath := filepath.Clean(filepath.Join(fs.root, "devices", addr.String(), "info.json"))
-
-	if !strings.HasPrefix(infoPath, fs.root) {
-		return httperror.NewBadRequest("Invalid path")
-	}
-
-	err := os.MkdirAll(filepath.Dir(infoPath), 0644)
+	deviceDir, err := fs.ensureDeviceExist(addr)
 	if err != nil {
 		return err
 	}
+
+	// Create required directories
+	infoPath := filepath.Join(deviceDir, "info.json")
 
 	// JSON encode data
 	jsonData, err := json.Marshal(info)
@@ -70,17 +79,13 @@ func (fs *FileSystem) LogDeviceInfo(addr net.HardwareAddr, info map[string]inter
 }
 
 func (fs *FileSystem) LogDeviceRequest(addr net.HardwareAddr, info map[string]interface{}) error {
-	// Create required directories
-	logPath := filepath.Clean(filepath.Join(fs.root, "devices", addr.String(), "request.log"))
-
-	if !strings.HasPrefix(logPath, fs.root) {
-		return httperror.NewBadRequest("Invalid path")
-	}
-
-	err := os.MkdirAll(filepath.Dir(logPath), 0644)
+	deviceDir, err := fs.ensureDeviceExist(addr)
 	if err != nil {
 		return err
 	}
+
+	// Create required directories
+	logPath := filepath.Join(deviceDir, "request.log")
 
 	// JSON encode data
 	jsonData, err := json.Marshal(info)
