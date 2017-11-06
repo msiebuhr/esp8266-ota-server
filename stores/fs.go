@@ -38,21 +38,6 @@ func NewFileSystem(root string) (*FileSystem, error) {
 	return &FileSystem{root: abspath}, nil
 }
 
-// Mock to emulate FS' interface
-func (fs *FileSystem) AddDevice(addr net.HardwareAddr, sketch []byte) {
-	sketchPath := filepath.Clean(filepath.Join(fs.root, "devices", addr.String(), "sketch", "active.bin"))
-
-	// Make sure 'sketch' exists
-	// TODO: sketch really should be a symlink into the apps-folder and
-	// active a symlink to the currently active host...
-	os.MkdirAll(filepath.Dir(sketchPath), 0755)
-
-	err := ioutil.WriteFile(sketchPath, sketch, 0644)
-	if err != nil {
-		panic(err)
-	}
-}
-
 func (fs *FileSystem) LogDeviceInfo(addr net.HardwareAddr, info map[string]interface{}) error {
 	// Create required directories
 	infoPath := filepath.Clean(filepath.Join(fs.root, "devices", addr.String(), "info.json"))
