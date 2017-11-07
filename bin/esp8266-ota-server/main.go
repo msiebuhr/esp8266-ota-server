@@ -71,6 +71,8 @@ func main() {
 
 	http.Handle("/get", updateHandler)
 
+	http.Handle("/admin/", http.StripPrefix("/admin", store.GetAdminMux()))
+
 	fmt.Printf("Starting server on %s:8080\n", GetOutboundIP())
 	http.ListenAndServe(":8080", nil)
 }

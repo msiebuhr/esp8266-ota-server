@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<title>ESP8266 Dashboard</title>
+<!-- Required meta tags -->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+<!-- Bootstrap CSS -->
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/css/bootstrap.min.css" integrity="sha384-PsH8R72JQ3SOdhVi3uxftmaW6Vc51MKb0q5P2rRUpPvrszuE4W1povHYgTpBfshb" crossorigin="anonymous">
+</head>
+<body>
+<div id="app" class="container">
+<nav class="navbar navbar-light bg-light">
+  <span class="navbar-brand mb-0 h2">ESP8266 Dashboard</span>
+</nav>
+
+<h4>Devices</h4>
+
+<div class="card" style="width: 20rem;" v-for="device in devices">
+  <div class="card-body">
+	<h4 class="card-title">{{ device['Sta-Mac'] }}</h4>
+	<h6 class="card-subtitle mb-2 text-muted">{{ device.Version }}</h6>
+  </div>
+	<!--<p class="card-text">{{ device }}</p>-->
+  <ul class="list-group list-group-flush">
+  <li class="list-group-item" v-for="value, key in device"><b>{{ key }}</b> {{value}}</li>
+  </ul>
+  <div class="card-body">
+    <a href="#" class="card-link">View Log</a>
+    <a href="#" class="card-link">Change App</a>
+  </div>
+</div>
+
+<h4>Apps</h4>
+
+<div class="card" style="width: 20rem;" v-for="app in apps">
+  <div class="card-body">
+  <h4 class="card-title">{{ app.Name }}</h4>
+  <h6 class="card-subtitle mb-2 text-muted">{{ app.Sketches.length }} sketches, active is {{ app.ActiveSketch }}</h6>
+  <p class="card-text">
+  <select class="custom-select" v-model="app._selectedSketch">
+  <option v-bind:value="s.Name"  v-for="s in app.Sketches">{{ s.Name }} ({{ s.Size }}B / {{s.ModTime}})</option>
+</select>
+  </p>
+  <p class="card-text text-right">
+    <a href="#" class="card-link">Card link</a>
+	<button type="button"
+		class="btn btn-primary"
+		v-on:click="pushNewApp(app)"
+		v-bind:disabled="app.ActiveSketch === app._selectedSketch">Save changes</button>
+		</p>
+  </div>
+</div>
+
+</div>
+
+<!-- Optional JavaScript -->
+<!-- jQuery first, then Popper.js, then Bootstrap JS -->
+<script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.3/umd/popper.min.js" integrity="sha384-vFJXuSJphROIrBnz7yo7oB41mKfc8JzQZiCq4NCceLEaO4IHwicKwpJf9c9IpFgh" crossorigin="anonymous"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/js/bootstrap.min.js" integrity="sha384-alpBpkh1PFOepccYVYDB4do5UnbKysX5WZXm3XxPqe5iKTfUKjNkCk9SaVuEZflJ" crossorigin="anonymous"></script>
+
+
+<script src="https://unpkg.com/vue"></script>
+<script src="https://cdn.jsdelivr.net/npm/vue-resource@1.3.4"></script>
+
+<script type="text/javascript">
+var app = new Vue({
+  el: '#app',
+  data: {
+    //message: 'You loaded this page on ' + new Date().toLocaleString(),
+	devices: [],
+	apps: [],
+  },
+  methods: {
+	  pushNewApp: function pushNewApp(app) {
+		  console.log('got', arguments)
+		  this.$http.post('/admin/apps/set-sketch', {
+			Name: app.Name,
+			ActiveSketch: app._selectedSketch
+			}).then(function ok() {
+		  app.ActiveSketch = app._selectedSketch;
+		  }, function err(err) {
+			alert(err);
+		  });
+	  }
+  },
+  created: function () {
+	  // GET /someUrl
+	  this.$http.get('/admin/devices').then(response => {
+		  this.devices = Object.values(response.body).map(d => {
+			return JSON.parse(d.info);
+		  })
+	  });
+
+	  this.$http.get('/admin/apps').then(response => {
+		  this.apps = response.body.map((app) => {
+		    // Shadow some properties for change-tracking
+			app._selectedSketch = app.ActiveSketch;
+			console.log(app)
+			return app;
+		  });
+	  });
+  }
+});
+</script>
+
+</body>
+</html>

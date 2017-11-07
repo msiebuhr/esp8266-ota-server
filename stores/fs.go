@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
+	"net/http"
 	"os"
+	"time"
 	"path/filepath"
 	"strings"
 
@@ -35,6 +37,16 @@ func (fs FileSystem) ensureDeviceExist(addr net.HardwareAddr) (string, error) {
 
 	err := os.MkdirAll(devicePath, 0644)
 	return devicePath, err
+}
+func (fs FileSystem) ensureAppExist(name string) (string, error) {
+	appPath := filepath.Clean(filepath.Join(fs.root, "apps", name))
+
+	if !strings.HasPrefix(appPath, fs.root) {
+		return "", httperror.NewBadRequest("Invalid path")
+	}
+
+	err := os.MkdirAll(appPath, 0644)
+	return appPath, err
 }
 
 func NewFileSystem(root string) (*FileSystem, error) {
@@ -134,4 +146,222 @@ func (fs *FileSystem) GetDeviceSketch(addr net.HardwareAddr) ([]byte, error) {
 	}
 
 	return sketch, nil
+}
+
+// Simple-ish web interface
+func (fs *FileSystem) CreateApp(app string) error {
+	_, err := fs.ensureAppExist(app)
+	return err
+}
+
+func (fs *FileSystem) UploadAppSketch(app, sketchName string, sketch []byte) error {
+	dir, err := fs.ensureAppExist(app)
+	if err != nil {
+		return err
+	}
+
+	if !strings.HasSuffix(".bin", sketchName) {
+		sketchName = sketchName + ".bin"
+	}
+
+	return ioutil.WriteFile(filepath.Join(dir, sketchName), sketch, 0644)
+}
+
+func (fs *FileSystem) SetActiveAppSketch(app, sketchName string) error {
+	// TODO(mortens): Make sure target exist
+	// TODO(mortens): Don't bother if change is NO-OP
+	dir, err := fs.ensureAppExist(app)
+	if err != nil {
+		return err
+	}
+
+	if !strings.HasSuffix(sketchName, ".bin") {
+		sketchName = sketchName + ".bin"
+	}
+
+	// Need to remove active.bin first...
+	os.Remove(filepath.Join(dir, "active.bin"))
+
+	return os.Symlink(sketchName, filepath.Join(dir, "active.bin"))
+}
+
+func (fs *FileSystem) DeviceSetApp(addr net.HardwareAddr, app string) error {
+	devicePath, err := fs.ensureDeviceExist(addr)
+	if err != nil {
+		return err
+	}
+
+	appPath, err := fs.ensureAppExist(app)
+	if err != nil {
+		return err
+	}
+
+	// ln -s devicePath/sketch -> appPath (relative)
+	relPath, err := filepath.Rel(devicePath, appPath)
+	if err != nil {
+		return err
+	}
+
+	return os.Symlink(relPath, filepath.Join(devicePath, "sketch"))
+}
+
+// Quick handler that exposes admin interface
+
+func (fs *FileSystem) GetAdminMux() http.Handler {
+	mux := http.NewServeMux()
+
+	// Some handy structs
+	type appSketch struct {
+		Name string
+		Size int64
+		ModTime time.Time
+	}
+
+	type app struct {
+		Name string
+		ActiveSketch string
+		Sketches []appSketch
+	}
+
+	// List devices
+	// TODO: Should probably be API call...
+	mux.HandleFunc("/devices", func(w http.ResponseWriter, req *http.Request) {
+		defer req.Body.Close()
+
+		dir, err := os.Open(filepath.Join(fs.root, "devices"))
+		if err != nil {
+			httperror.WrapInternalServerError(err).Respond(w)
+			return
+		}
+
+		// List directories
+		entries, err := dir.Readdirnames(0)
+		if err != nil {
+			httperror.WrapInternalServerError(err).Respond(w)
+			return
+		}
+
+		data := map[string]map[string]interface{}{}
+
+		// TODO: Last seen, general info &c.
+		for _, entry := range entries {
+			baseDir := filepath.Join(fs.root, "devices", entry)
+			// Read info for file
+			info, _ := ioutil.ReadFile(
+				filepath.Join(baseDir, "info.json"),
+			)
+
+			data[entry] = map[string]interface{}{
+				"mac": entry,
+				"info": string(info),
+			}
+		}
+
+		j, err := json.Marshal(data)
+		if err != nil {
+			httperror.WrapInternalServerError(err).Respond(w)
+			return
+		}
+
+		w.Write(j)
+	})
+
+	mux.HandleFunc("/apps", func(w http.ResponseWriter, req *http.Request) {
+		defer req.Body.Close()
+
+		dir, err := os.Open(filepath.Join(fs.root, "apps"))
+		if err != nil {
+			httperror.WrapInternalServerError(err).Respond(w)
+			return
+		}
+		defer dir.Close()
+
+		// List directories
+		entries, err := dir.Readdirnames(0)
+		if err != nil {
+			httperror.WrapInternalServerError(err).Respond(w)
+			return
+		}
+
+		// Loop over apps
+		data := make([]app, len(entries))
+		for i, entry := range entries {
+			data[i].Name = entry;
+
+			// Read active sketch
+			target, err := os.Readlink(filepath.Join(fs.root, "apps", entry, "active.bin"))
+			if err == nil {
+				data[i].ActiveSketch = strings.TrimPrefix(target, "./")
+			}
+
+			// Open folder in question
+			subdir, err := os.Open(filepath.Join(fs.root, "apps", entry))
+			if err != nil {
+				httperror.WrapInternalServerError(err).Respond(w)
+				return
+			}
+
+			// List sketches
+			sketches, err := subdir.Readdir(0)
+			if err != nil {
+				httperror.WrapInternalServerError(err).Respond(w)
+				return
+			}
+			data[i].Sketches = make([]appSketch, 0, len(sketches) - 1)
+
+			for _, sketchLstat := range sketches {
+				if (sketchLstat.Name() == "active.bin") {
+					continue
+				}
+				data[i].Sketches = append(data[i].Sketches, appSketch{
+					Name : sketchLstat.Name(),
+					Size : sketchLstat.Size(),
+					ModTime : sketchLstat.ModTime().UTC().Round(1 * time.Second),
+				})
+			}
+		}
+
+		j, err := json.Marshal(data)
+		if err != nil {
+			httperror.WrapInternalServerError(err).Respond(w)
+			return
+		}
+
+		w.Write(j)
+	})
+
+	mux.HandleFunc("/apps/set-sketch", func(w http.ResponseWriter, req *http.Request) {
+		defer req.Body.Close()
+
+		// Read and parse JSON body
+		raw, err := ioutil.ReadAll(req.Body)
+		if err != nil {
+			httperror.WrapBadRequest(err).Respond(w)
+			return
+		}
+
+		data := &app{}
+		err = json.Unmarshal(raw,data);
+		if err != nil {
+			httperror.WrapBadRequest(err).Respond(w)
+			return
+		}
+
+		if (data.Name == "" || data.ActiveSketch == "") {
+			httperror.NewBadRequest("Missing parameter `Name` or `ActiveSketch`").Respond(w)
+			return
+		}
+
+		err = fs.SetActiveAppSketch(data.Name, data.ActiveSketch)
+		if err != nil {
+			httperror.WrapInternalServerError(err).Respond(w)
+			return
+		}
+
+		httperror.NewOK().Respond(w)
+	})
+
+	mux.Handle("/", http.FileServer(http.Dir("./stores/fs-static")))
+
+	return mux
 }
