@@ -8,9 +8,9 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"time"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/msiebuhr/httperror"
 )
@@ -207,20 +207,38 @@ func (fs *FileSystem) DeviceSetApp(addr net.HardwareAddr, app string) error {
 
 // Quick handler that exposes admin interface
 
+func unmarshalJSONBody(req *http.Request, v interface{}) error {
+	defer req.Body.Close()
+
+	// Read and parse JSON body
+	raw, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		return err
+	}
+
+	return json.Unmarshal(raw, v)
+}
+
 func (fs *FileSystem) GetAdminMux() http.Handler {
 	mux := http.NewServeMux()
 
 	// Some handy structs
 	type appSketch struct {
-		Name string
-		Size int64
+		Name    string
+		Size    int64
 		ModTime time.Time
 	}
 
 	type app struct {
-		Name string
+		Name         string
 		ActiveSketch string
-		Sketches []appSketch
+		Sketches     []appSketch
+	}
+
+	type device struct {
+		Name    string
+		Info    map[string]interface{}
+		AppName string
 	}
 
 	// List devices
@@ -241,19 +259,27 @@ func (fs *FileSystem) GetAdminMux() http.Handler {
 			return
 		}
 
-		data := map[string]map[string]interface{}{}
+		data := make([]device, len(entries))
 
 		// TODO: Last seen, general info &c.
-		for _, entry := range entries {
+		for i, entry := range entries {
+			data[i].Name = entry
+
 			baseDir := filepath.Join(fs.root, "devices", entry)
 			// Read info for file
 			info, _ := ioutil.ReadFile(
 				filepath.Join(baseDir, "info.json"),
 			)
 
-			data[entry] = map[string]interface{}{
-				"mac": entry,
-				"info": string(info),
+			err := json.Unmarshal(info, &data[i].Info)
+			if err != nil {
+				data[i].Info = map[string]interface{}{"err": err}
+			}
+
+			// Read active sketch
+			target, err := os.Readlink(filepath.Join(baseDir, "sketch"))
+			if err == nil {
+				data[i].AppName = filepath.Base(target)
 			}
 		}
 
@@ -286,12 +312,12 @@ func (fs *FileSystem) GetAdminMux() http.Handler {
 		// Loop over apps
 		data := make([]app, len(entries))
 		for i, entry := range entries {
-			data[i].Name = entry;
+			data[i].Name = entry
 
 			// Read active sketch
 			target, err := os.Readlink(filepath.Join(fs.root, "apps", entry, "active.bin"))
 			if err == nil {
-				data[i].ActiveSketch = strings.TrimPrefix(target, "./")
+				data[i].ActiveSketch = filepath.Base(target)
 			}
 
 			// Open folder in question
@@ -307,16 +333,16 @@ func (fs *FileSystem) GetAdminMux() http.Handler {
 				httperror.WrapInternalServerError(err).Respond(w)
 				return
 			}
-			data[i].Sketches = make([]appSketch, 0, len(sketches) - 1)
+			data[i].Sketches = make([]appSketch, 0, len(sketches)-1)
 
 			for _, sketchLstat := range sketches {
-				if (sketchLstat.Name() == "active.bin") {
+				if sketchLstat.Name() == "active.bin" {
 					continue
 				}
 				data[i].Sketches = append(data[i].Sketches, appSketch{
-					Name : sketchLstat.Name(),
-					Size : sketchLstat.Size(),
-					ModTime : sketchLstat.ModTime().UTC().Round(1 * time.Second),
+					Name:    sketchLstat.Name(),
+					Size:    sketchLstat.Size(),
+					ModTime: sketchLstat.ModTime().UTC().Round(1 * time.Second),
 				})
 			}
 		}
@@ -331,23 +357,14 @@ func (fs *FileSystem) GetAdminMux() http.Handler {
 	})
 
 	mux.HandleFunc("/apps/set-sketch", func(w http.ResponseWriter, req *http.Request) {
-		defer req.Body.Close()
-
-		// Read and parse JSON body
-		raw, err := ioutil.ReadAll(req.Body)
-		if err != nil {
-			httperror.WrapBadRequest(err).Respond(w)
-			return
-		}
-
 		data := &app{}
-		err = json.Unmarshal(raw,data);
+		err := unmarshalJSONBody(req, data)
 		if err != nil {
 			httperror.WrapBadRequest(err).Respond(w)
 			return
 		}
 
-		if (data.Name == "" || data.ActiveSketch == "") {
+		if data.Name == "" || data.ActiveSketch == "" {
 			httperror.NewBadRequest("Missing parameter `Name` or `ActiveSketch`").Respond(w)
 			return
 		}
