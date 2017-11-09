@@ -1,117 +1,172 @@
 <!doctype html>
 <html lang="en">
+
 <head>
-<title>ESP8266 Dashboard</title>
-<!-- Required meta tags -->
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+	<title>ESP8266 Dashboard</title>
+	<!-- Required meta tags -->
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 
-<!-- Bootstrap CSS -->
-<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/css/bootstrap.min.css" integrity="sha384-PsH8R72JQ3SOdhVi3uxftmaW6Vc51MKb0q5P2rRUpPvrszuE4W1povHYgTpBfshb" crossorigin="anonymous">
+	<!-- Bootstrap CSS -->
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/css/bootstrap.min.css" integrity="sha384-PsH8R72JQ3SOdhVi3uxftmaW6Vc51MKb0q5P2rRUpPvrszuE4W1povHYgTpBfshb"
+	 crossorigin="anonymous">
 </head>
+
 <body>
-<div id="app" class="container">
-<nav class="navbar navbar-light bg-light">
-  <span class="navbar-brand mb-0 h2">ESP8266 Dashboard</span>
-</nav>
+	<div id="app" class="container">
+		<nav class="navbar navbar-light bg-light">
+			<span class="navbar-brand mb-0 h2">ESP8266 Dashboard</span>
+		</nav>
 
-<h4>Devices</h4>
+		<h4>Devices</h4>
+		<div class="card-columns">
+			<div class="card p-3 bg-primary">
+				<div class="card-body">
+					<h4 class="card-title">Drag devices</h4>
+					<p class="card-text">If you drag a device to an app, that app will be installed next time the deivce phones home</p>
+				</div>
+			</div>
 
-<div class="card" style="width: 20rem;" v-for="device in devices">
-  <div class="card-body">
-	<h4 class="card-title">{{ device.Name }}</h4>
-	<h6 class="card-subtitle mb-2 text-muted">{{ device.AppName }}</h6>
-  </div>
-	<!--<p class="card-text">{{ device }}</p>-->
-  <ul class="list-group list-group-flush">
-  <li class="list-group-item" v-for="value, key in device.Info"><b>{{ key }}</b> {{value}}</li>
-  </ul>
-  <div class="card-body">
-    <a href="#" class="card-link">View Log</a>
-    <a href="#" class="card-link">Change App</a>
-  </div>
-</div>
+			<div class="card" v-for="device in devices">
+				<div class="card-body">
+					<h4 class="card-title">{{ device.Name }}</h4>
+					<h6 class="card-subtitle mb-2 text-muted">{{ device.AppName }}</h6>
+				</div>
+				<ul class="list-group list-group-flush text-small">
+					<li class="list-group-item" v-for="value, key in device.Info">
+						<b>{{ key }}</b> {{value}}
+					</li>
+				</ul>
+
+				<div class="card-body">
+					<p class="card-text">
+						<select style="width: 100%" class="custom-select" v-model="device.AppName">
+							<option v-bind:value="a.Name" v-for="a in apps">{{ a.Name }}</option>
+						</select>
+					</p>
+					<p class="card-text text-right">
+						<button type="button" class="btn btn-primary" v-on:click="deviceSetApp(device)" v-bind:disabled="false">Save changes</button>
+					</p>
+					<a href="#" class="card-link">View Log</a>
+				</div>
+			</div>
+		</div>
+		<!-- /card-columns -->
+
+		<h4>Apps</h4>
+
+		<div class="card-columns">
 
 
-<h4>Apps</h4>
+			<div class="card" style="width: 20rem;" v-for="app in apps">
+				<div class="card-body">
+					<h4 class="card-title">{{ app.Name }}</h4>
+					<h6 class="card-subtitle mb-2 text-muted">{{ app.Sketches.length }} sketches, active is {{ app.ActiveSketch }}</h6>
+					<!-- list of devices -->
+					<p class="card-text">
 
-<div class="card" style="width: 20rem;" v-for="app in apps">
-  <div class="card-body">
-  <h4 class="card-title">{{ app.Name }}</h4>
-  <h6 class="card-subtitle mb-2 text-muted">{{ app.Sketches.length }} sketches, active is {{ app.ActiveSketch }}</h6>
-  <!-- list of devices -->
-  <p class="card-text">
+						<span class="badge badge-primary" v-for="device in devices" v-if="device.AppName == app.Name">
+							{{device.Name}}
+						</span>
 
-  <span class="badge badge-primary" v-for="device in devices" v-if="device.AppName == app.Name">
-  {{device.Name}}
-  </span>
+					</p>
 
-  </p>
+					<!-- app version picker -->
+					<!-- TODO: Uploader -->
+					<p class="card-text">
+						<select class="custom-select" v-model="app._selectedSketch">
+							<option v-bind:value="s.Name" v-for="s in app.Sketches">{{ s.Name }} ({{ s.Size }}B / {{s.ModTime}})</option>
+						</select>
+					</p>
+					<p class="card-text text-right">
+						<button type="button" class="btn btn-primary" v-on:click="pushNewApp(app)" v-bind:disabled="app.ActiveSketch === app._selectedSketch">Save changes</button>
+					</p>
+				</div>
+			</div>
 
-  <!-- app version picker -->
-  <!-- TODO: Uploader -->
-  <p class="card-text">
-  <select class="custom-select" v-model="app._selectedSketch">
-  <option v-bind:value="s.Name"  v-for="s in app.Sketches">{{ s.Name }} ({{ s.Size }}B / {{s.ModTime}})</option>
-</select>
-  </p>
-  <p class="card-text text-right">
-	<button type="button"
-		class="btn btn-primary"
-		v-on:click="pushNewApp(app)"
-		v-bind:disabled="app.ActiveSketch === app._selectedSketch">Save changes</button>
-		</p>
-  </div>
-</div>
+			<!-- static card for new apps -->
+			<div class="card">
+				<div class="card-body">
+					<h4 class="card-title">Create new app</h4>
+					<p>
+						<input type="text" class="form-control" placeholder="New App name" v-model="newAppName">
+					</p>
+					<p class="card-text text-right">
+						<button type="button" class="btn btn-primary" v-on:click="newApp(newAppName)">Create
+						</button>
+					</p>
+				</div>
+			</div>
 
-</div>
+		</div>
+		<!-- /card-columns -->
+	</div>
 
-<!-- Optional JavaScript -->
-<!-- jQuery first, then Popper.js, then Bootstrap JS -->
-<script src="https://unpkg.com/vue@2.5.3/dist/vue.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/vue-resource@1.3.4"></script>
+	<!-- Optional JavaScript -->
+	<!-- jQuery first, then Popper.js, then Bootstrap JS -->
+	<script src="https://unpkg.com/vue@2.5.3/dist/vue.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/vue-resource@1.3.4"></script>
 
-<script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.3/umd/popper.min.js" integrity="sha384-vFJXuSJphROIrBnz7yo7oB41mKfc8JzQZiCq4NCceLEaO4IHwicKwpJf9c9IpFgh" crossorigin="anonymous"></script>
-<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/js/bootstrap.min.js" integrity="sha384-alpBpkh1PFOepccYVYDB4do5UnbKysX5WZXm3XxPqe5iKTfUKjNkCk9SaVuEZflJ" crossorigin="anonymous"></script>
+	<script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN"
+	 crossorigin="anonymous"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.3/umd/popper.min.js" integrity="sha384-vFJXuSJphROIrBnz7yo7oB41mKfc8JzQZiCq4NCceLEaO4IHwicKwpJf9c9IpFgh"
+	 crossorigin="anonymous"></script>
+	<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/js/bootstrap.min.js" integrity="sha384-alpBpkh1PFOepccYVYDB4do5UnbKysX5WZXm3XxPqe5iKTfUKjNkCk9SaVuEZflJ"
+	 crossorigin="anonymous"></script>
 
-<script type="text/javascript">
-var app = new Vue({
-  el: '#app',
-  data: {
-    //message: 'You loaded this page on ' + new Date().toLocaleString(),
-	devices: [],
-	apps: [],
-  },
-  methods: {
-	  pushNewApp: function pushNewApp(app) {
-		  console.log('got', arguments)
-		  this.$http.post('/admin/apps/set-sketch', {
-			Name: app.Name,
-			ActiveSketch: app._selectedSketch
-			}).then(function ok() {
-		  app.ActiveSketch = app._selectedSketch;
-		  }, function err(err) {
-			alert(err);
-		  });
-	  }
-  },
-  created: function () {
-	  // GET /someUrl
-	  this.$http.get('/admin/devices').then(response => {
-		  this.devices = response.body;
-	  });
+	<script type="text/javascript">
+		var app = new Vue({
+			el: '#app',
+			data: {
+				//message: 'You loaded this page on ' + new Date().toLocaleString(),
+				devices: [],
+				apps: [],
+				newAppName: ""
+			},
+			methods: {
+				// Pick a new active sketch for `app`
+				pushNewApp: function pushNewApp(app) {
+					this.$http.post('/admin/apps/set-sketch', {
+						Name: app.Name,
+						ActiveSketch: app._selectedSketch
+					}).then(function ok() {
+						app.ActiveSketch = app._selectedSketch;
+					}, function err(err) {
+						alert(err);
+					});
+				},
 
-	  this.$http.get('/admin/apps').then(response => {
-		  this.apps = response.body.map((app) => {
-		    // Shadow some properties for change-tracking
-			app._selectedSketch = app.ActiveSketch;
-			return app;
-		  });
-	  });
-  }
-});
-</script>
+				// Create a new app
+				newApp: function newApp(name) {
+					this.$http.post('/admin/apps/new', {
+						Name: name
+					})
+					// TODO(mortens): reload
+				},
+
+				deviceSetApp: function deviceSetApp(device) {
+					this.$http.post('/admin/device/set-app', device)
+				}
+
+			},
+			// Hook when app starts up
+			created: function () {
+				// TODO: Reqwrite this as a function we can call to reload	
+				this.$http.get('/admin/devices').then(response => {
+					this.devices = response.body;
+				});
+
+				this.$http.get('/admin/apps').then(response => {
+					this.apps = response.body.map((app) => {
+						// Shadow some properties for change-tracking
+						app._selectedSketch = app.ActiveSketch;
+						return app;
+					});
+				});
+			}
+		});
+	</script>
 
 </body>
+
 </html>

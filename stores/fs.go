@@ -35,7 +35,7 @@ func (fs FileSystem) ensureDeviceExist(addr net.HardwareAddr) (string, error) {
 		return "", httperror.NewBadRequest("Invalid path")
 	}
 
-	err := os.MkdirAll(devicePath, 0644)
+	err := os.MkdirAll(devicePath, 0755)
 	return devicePath, err
 }
 func (fs FileSystem) ensureAppExist(name string) (string, error) {
@@ -45,7 +45,7 @@ func (fs FileSystem) ensureAppExist(name string) (string, error) {
 		return "", httperror.NewBadRequest("Invalid path")
 	}
 
-	err := os.MkdirAll(appPath, 0644)
+	err := os.MkdirAll(appPath, 0755)
 	return appPath, err
 }
 
@@ -292,6 +292,34 @@ func (fs *FileSystem) GetAdminMux() http.Handler {
 		w.Write(j)
 	})
 
+	mux.HandleFunc("/device/set-app", func(w http.ResponseWriter, req *http.Request) {
+		data := &device{}
+		err := unmarshalJSONBody(req, data)
+		if err != nil {
+			httperror.WrapBadRequest(err).Respond(w)
+			return
+		}
+
+		if data.Name == "" || data.AppName == "" {
+			httperror.NewBadRequest("Missing parameter `Name` or `AppName`").Respond(w)
+			return
+		}
+
+		mac, err := net.ParseMAC(data.Name)
+		if err != nil {
+			httperror.WrapBadRequest(err).Respond(w)
+			return
+		}
+
+		err = fs.DeviceSetApp(mac, data.AppName)
+		if err != nil {
+			httperror.WrapInternalServerError(err).Respond(w)
+			return
+		}
+
+		httperror.NewOK().Respond(w)
+	})
+
 	mux.HandleFunc("/apps", func(w http.ResponseWriter, req *http.Request) {
 		defer req.Body.Close()
 
@@ -333,7 +361,7 @@ func (fs *FileSystem) GetAdminMux() http.Handler {
 				httperror.WrapInternalServerError(err).Respond(w)
 				return
 			}
-			data[i].Sketches = make([]appSketch, 0, len(sketches)-1)
+			data[i].Sketches = make([]appSketch, 0, 0)
 
 			for _, sketchLstat := range sketches {
 				if sketchLstat.Name() == "active.bin" {
@@ -354,6 +382,28 @@ func (fs *FileSystem) GetAdminMux() http.Handler {
 		}
 
 		w.Write(j)
+	})
+
+	mux.HandleFunc("/apps/new", func(w http.ResponseWriter, req *http.Request) {
+		data := &app{}
+		err := unmarshalJSONBody(req, data)
+		if err != nil {
+			httperror.WrapBadRequest(err).Respond(w)
+			return
+		}
+
+		if data.Name == "" {
+			httperror.NewBadRequest("Missing parameter `Name` or `ActiveSketch`").Respond(w)
+			return
+		}
+
+		err = fs.CreateApp(data.Name)
+		if err != nil {
+			httperror.WrapInternalServerError(err).Respond(w)
+			return
+		}
+
+		httperror.NewOK().Respond(w)
 	})
 
 	mux.HandleFunc("/apps/set-sketch", func(w http.ResponseWriter, req *http.Request) {
