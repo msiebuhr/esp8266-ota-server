@@ -3,7 +3,6 @@ package stores
 import (
 	"crypto/md5"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -135,7 +134,6 @@ func (fs *FileSystem) GetDeviceSketch(addr net.HardwareAddr) ([]byte, error) {
 	// Does the device exist?
 	hwPath := filepath.Clean(filepath.Join(fs.root, "devices", addr.String(), "sketch", "active.bin"))
 	if !strings.HasPrefix(hwPath, fs.root) {
-		fmt.Println(fs.root, hwPath)
 		return []byte{}, httperror.NewBadRequest("Invalid path")
 	}
 
