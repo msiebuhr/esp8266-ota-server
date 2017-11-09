@@ -69,7 +69,7 @@ func main() {
 
 	updateHandler := esp8266ota.NewHandler(store)
 
-	http.Handle("/get", updateHandler)
+	http.Handle("/get", esp8266ota.Notify()(updateHandler))
 
 	http.Handle("/admin/", http.StripPrefix("/admin", store.GetAdminMux()))
 

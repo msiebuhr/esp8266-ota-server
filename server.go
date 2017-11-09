@@ -9,7 +9,7 @@ package esp8266ota
 import (
 	"bytes"
 	"encoding/hex"
-	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"strconv"
@@ -18,6 +18,38 @@ import (
 
 	"github.com/msiebuhr/httperror"
 )
+
+type Adapter func(http.Handler) http.Handler
+
+type loggingResponseWriter struct {
+	status int
+	http.ResponseWriter
+}
+
+func (w *loggingResponseWriter) WriteHeader(code int) {
+	w.status = code
+	w.ResponseWriter.WriteHeader(code)
+}
+
+func (w *loggingResponseWriter) Write(body []byte) (int, error) {
+	return w.ResponseWriter.Write(body)
+}
+
+func Notify() Adapter {
+	return func(h http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+			loggingRW := &loggingResponseWriter{
+				ResponseWriter: w,
+			}
+
+			defer func() {
+				log.Printf("%s %s %s -> %d", r.Proto, r.Method, r.URL, loggingRW.status)
+			}()
+			h.ServeHTTP(loggingRW, r)
+		})
+	}
+}
 
 type Handler struct {
 	store Store
@@ -46,7 +78,6 @@ func (s Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("Got MAC", mac, "md5", hex.EncodeToString(md5))
 
 	// TODO: Update device's info with new data
 	//info = s.store.GetDeviceInfo(mac);
