@@ -196,6 +196,9 @@ func (fs *FileSystem) DeviceSetApp(addr net.HardwareAddr, app string) error {
 		return err
 	}
 
+	// Need to remove active.bin first...
+	os.Remove(filepath.Join(devicePath, "sketch"))
+
 	// ln -s devicePath/sketch -> appPath (relative)
 	relPath, err := filepath.Rel(devicePath, appPath)
 	if err != nil {
