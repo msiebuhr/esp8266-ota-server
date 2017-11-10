@@ -10,14 +10,22 @@
 	<!-- Bootstrap CSS -->
 	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/css/bootstrap.min.css" integrity="sha384-PsH8R72JQ3SOdhVi3uxftmaW6Vc51MKb0q5P2rRUpPvrszuE4W1povHYgTpBfshb"
 	 crossorigin="anonymous">
+	<style>
+		/*
+		 Primary Orange E8400C
+		 Secondary Orange FF3C00
+		 Primary Blue 1437CC
+		 Secondary Blue 0929B2
+     */
+	</style>
 </head>
 
 <body>
-	<div id="app" class="container">
-		<nav class="navbar navbar-light bg-light">
-			<span class="navbar-brand mb-0 h2">ESP8266 Dashboard</span>
-		</nav>
+	<nav class="navbar navbar-dark" style="background:	#E8400C">
+		<span class="navbar-brand mb-0 h2">ESP8266 Dashboard</span>
+	</nav>
 
+	<main id="app" class="container-fluid">
 		<h4>Devices</h4>
 		<div class="card-columns">
 			<div class="card p-3 bg-primary">
@@ -71,9 +79,17 @@
 
 					</p>
 
-					<!-- app version picker -->
-					<!-- TODO: Uploader -->
 					<p class="card-text">
+						<!-- TODO: Uploader -->
+						<form action="/admin/apps/add-sketch">
+							<label class="custom-file">
+								<input type="file" id="file2" class="custom-file-input">
+								<span class="custom-file-control"></span>
+							</label>
+							<input type="submit" value="Send">
+						</form>
+
+						<!-- app version picker -->
 						<select class="custom-select" v-model="app._selectedSketch">
 							<option v-bind:value="s.Name" v-for="s in app.Sketches">{{ s.Name }} ({{ s.Size }}B / {{s.ModTime}})</option>
 						</select>
@@ -100,8 +116,7 @@
 
 		</div>
 		<!-- /card-columns -->
-	</div>
-
+	</main>
 	<!-- Optional JavaScript -->
 	<!-- jQuery first, then Popper.js, then Bootstrap JS -->
 	<script src="https://unpkg.com/vue@2.5.3/dist/vue.js"></script>
