@@ -44,7 +44,8 @@ func Notify() Adapter {
 			}
 
 			defer func() {
-				log.Printf("%s %s %s -> %d", r.Proto, r.Method, r.URL, loggingRW.status)
+				mac, _ := r.Header["X-Esp8266-Sta-Mac"] // Corerct one?
+				log.Printf("%s %s %s Mac: %s -> %d", r.Proto, r.Method, r.URL, mac, loggingRW.status)
 			}()
 			h.ServeHTTP(loggingRW, r)
 		})
