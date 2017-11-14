@@ -5,6 +5,7 @@
 	<title>ESP8266 Dashboard</title>
 	<!-- Required meta tags -->
 	<meta charset="utf-8">
+	<link rel="shortcut icon" href="./favicon.svg">
 	<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 
 	<!-- Bootstrap CSS -->
@@ -21,101 +22,60 @@
 </head>
 
 <body>
-	<nav class="navbar navbar-dark" style="background:	#E8400C">
-		<span class="navbar-brand mb-0 h2">ESP8266 Dashboard</span>
+	<nav class="navbar navbar-dark" style="background:#E8400C">
+		<span class="container">
+			<a class="navbar-brand" href="#">
+				<img src="./favicon-inverted.svg" width="30" height="30" alt="">
+				<span class="navbar-brand mb-0 h2">ESP8266 Dashboard</span>
+			</a>
+		</span>
 	</nav>
 
-	<main id="app" class="container-fluid">
-		<h4>Devices</h4>
-		<div class="card-columns">
-			<div class="card p-3 bg-primary">
-				<div class="card-body">
-					<h4 class="card-title">Drag devices</h4>
-					<p class="card-text">If you drag a device to an app, that app will be installed next time the deivce phones home</p>
-				</div>
-			</div>
+	<main id="app" class="container">
+		<!-- Loop over apps -->
+		<div v-for="app in apps">
+			<h1>{{ app.Name }}</h1>
+			<h3 class="card-subtitle mb-2 text-muted">{{ app.Sketches.length }} sketches, active is {{ app.ActiveSketch }}</h3>
 
-			<div class="card" v-for="device in devices">
-				<div class="card-body">
-					<h4 class="card-title">{{ device.Name }}</h4>
-					<h6 class="card-subtitle mb-2 text-muted">{{ device.AppName }}</h6>
-				</div>
-				<ul class="list-group list-group-flush text-small">
-					<li class="list-group-item" v-for="value, key in device.Info">
+			<!-- TODO: Uploader -->
+			<form class="form-inline" action="/admin/apps/add-sketch">
+				<label clas="col-1">Sketch</label>
+				<select class="custom-select col-3" v-model="app._selectedSketch">
+					<option v-bind:value="s.Name" v-for="s in app.Sketches">{{ s.Name }} ({{ s.Size }}B / {{s.ModTime}})</option>
+					<option value="_new_file_upload_">Upload new image</option>
+				</select>
+				<!--
+				<label class="custom-file col-3">
+					<input type="file" id="file2" class="custom-file-input">
+					<span class="custom-file-control"></span>
+				</label>
+			-->
+				<input class="col-2" type="submit" value="Send">
+				<button class="col-2" type="button" class="btn btn-primary" v-on:click="pushNewApp(app)" v-bind:disabled="app.ActiveSketch === app._selectedSketch">Save changes</button>
+			</form>
+			</p>
+
+			<table class="table">
+				<tr v-for="device in devices" v-if="device.AppName == app.Name">
+					<td>{{ device.Name }}</td>
+					<td>{{ device.AppName }}</td>
+					<!--
+					<td v-for="value, key in device.Info">
 						<b>{{ key }}</b> {{value}}
-					</li>
-				</ul>
-
-				<div class="card-body">
-					<p class="card-text">
-						<select style="width: 100%" class="custom-select" v-model="device.AppName">
-							<option v-bind:value="a.Name" v-for="a in apps">{{ a.Name }}</option>
-						</select>
-					</p>
-					<p class="card-text text-right">
-						<button type="button" class="btn btn-primary" v-on:click="deviceSetApp(device)" v-bind:disabled="false">Save changes</button>
-					</p>
-					<a href="#" class="card-link">View Log</a>
-				</div>
-			</div>
-		</div>
-		<!-- /card-columns -->
-
-		<h4>Apps</h4>
-
-		<div class="card-columns">
-
-
-			<div class="card" style="width: 20rem;" v-for="app in apps">
-				<div class="card-body">
-					<h4 class="card-title">{{ app.Name }}</h4>
-					<h6 class="card-subtitle mb-2 text-muted">{{ app.Sketches.length }} sketches, active is {{ app.ActiveSketch }}</h6>
-					<!-- list of devices -->
-					<p class="card-text">
-
-						<span class="badge badge-primary" v-for="device in devices" v-if="device.AppName == app.Name">
-							{{device.Name}}
-						</span>
-
-					</p>
-
-					<p class="card-text">
-						<!-- TODO: Uploader -->
-						<form action="/admin/apps/add-sketch">
-							<label class="custom-file">
-								<input type="file" id="file2" class="custom-file-input">
-								<span class="custom-file-control"></span>
-							</label>
-							<input type="submit" value="Send">
+					</td>
+				-->
+					<td>
+						<form class="form-inline">
+							<select style="" class="form-control" v-model="device.AppName">
+								<option v-bind:value="a.Name" v-for="a in apps">{{ a.Name }}</option>
+							</select>
+							<button type="button" class="btn btn-primary" v-on:click="deviceSetApp(device)" v-bind:disabled="false">Save changes</button>
 						</form>
-
-						<!-- app version picker -->
-						<select class="custom-select" v-model="app._selectedSketch">
-							<option v-bind:value="s.Name" v-for="s in app.Sketches">{{ s.Name }} ({{ s.Size }}B / {{s.ModTime}})</option>
-						</select>
-					</p>
-					<p class="card-text text-right">
-						<button type="button" class="btn btn-primary" v-on:click="pushNewApp(app)" v-bind:disabled="app.ActiveSketch === app._selectedSketch">Save changes</button>
-					</p>
-				</div>
-			</div>
-
-			<!-- static card for new apps -->
-			<div class="card">
-				<div class="card-body">
-					<h4 class="card-title">Create new app</h4>
-					<p>
-						<input type="text" class="form-control" placeholder="New App name" v-model="newAppName">
-					</p>
-					<p class="card-text text-right">
-						<button type="button" class="btn btn-primary" v-on:click="newApp(newAppName)">Create
-						</button>
-					</p>
-				</div>
-			</div>
+					</td>
+				</tr>
+			</table>
 
 		</div>
-		<!-- /card-columns -->
 	</main>
 	<!-- Optional JavaScript -->
 	<!-- jQuery first, then Popper.js, then Bootstrap JS -->
