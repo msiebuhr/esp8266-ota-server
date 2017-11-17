@@ -1,6 +1,7 @@
 package stores
 
 import (
+	"bytes"
 	"crypto/md5"
 	"encoding/json"
 	"io/ioutil"
@@ -228,6 +229,8 @@ func (fs *FileSystem) GetAdminMux() http.Handler {
 		Name    string
 		Size    int64
 		ModTime time.Time
+		// Only used when uploading new sketches
+		Data []byte
 	}
 
 	type app struct {
@@ -421,6 +424,33 @@ func (fs *FileSystem) GetAdminMux() http.Handler {
 		}
 
 		err = fs.SetActiveAppSketch(data.Name, data.ActiveSketch)
+		if err != nil {
+			httperror.WrapInternalServerError(err).Respond(w)
+			return
+		}
+
+		httperror.NewOK().Respond(w)
+	})
+
+	mux.HandleFunc("/apps/add-sketch", func(w http.ResponseWriter, req *http.Request) {
+		data := &app{}
+		err := unmarshalJSONBody(req, data)
+		if err != nil {
+			httperror.WrapBadRequest(err).Respond(w)
+			return
+		}
+
+		if data.Name == "" || len(data.Sketches) == 0 || data.Sketches[0].Name == "" || len(data.Sketches[0].Data) == 0 {
+			httperror.NewBadRequest("Missing parameter `Name` or `Sketches`").Respond(w)
+			return
+		}
+
+		if !bytes.HasPrefix(data.Sketches[0].Data, []byte{0xe9, 0x01, 0x02, 0x40, 0x9c, 0xf2, 0x10, 0x40}) {
+			httperror.NewBadRequest("File has unexpected magic numbers").Respond(w)
+			return
+		}
+
+		err = fs.UploadAppSketch(data.Name, data.Sketches[0].Name, data.Sketches[0].Data)
 		if err != nil {
 			httperror.WrapInternalServerError(err).Respond(w)
 			return

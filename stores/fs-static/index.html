@@ -39,19 +39,15 @@
 
 			<!-- TODO: Uploader -->
 			<form class="form-inline" action="/admin/apps/add-sketch">
-				<label clas="col-1">Sketch</label>
-				<select class="custom-select col-3" v-model="app._selectedSketch">
+				<span class="col-1">Sketch</span>
+				<select class="custom-select col-4" v-model="app._selectedSketch">
 					<option v-bind:value="s.Name" v-for="s in app.Sketches">{{ s.Name }} ({{ s.Size }}B / {{s.ModTime}})</option>
 					<option value="_new_file_upload_">Upload new image</option>
 				</select>
-				<!--
-				<label class="custom-file col-3">
-					<input type="file" id="file2" class="custom-file-input">
-					<span class="custom-file-control"></span>
-				</label>
-			-->
-				<input class="col-2" type="submit" value="Send">
-				<button class="col-2" type="button" class="btn btn-primary" v-on:click="pushNewApp(app)" v-bind:disabled="app.ActiveSketch === app._selectedSketch">Save changes</button>
+				<input id="sketchFilePicker" type="file" style="display:none" v-on:change="onFileChange(app, $event)" />
+				<div class="col-2">
+					<button type="button" class="btn btn-primary" v-on:click="pushNewApp(app)" v-bind:disabled="app.ActiveSketch === app._selectedSketch">Save changes</button>
+				</div>
 			</form>
 			</p>
 
@@ -99,8 +95,33 @@
 				newAppName: ""
 			},
 			methods: {
+				onFileChange(app, e) {
+					var that = this;
+					var reader = new FileReader();
+					reader.addEventListener("loadend", function () {
+						// reader.result contains the contents of blob as a typed array
+						that.$http.post('/admin/apps/add-sketch', {
+							Name: app.Name,
+							Sketches: [{
+								Data: reader.result.split(';base64,')[1],
+								Name: files[0].name
+							}]
+						})
+					});
+					var files = e.target.files || e.dataTransfer.files;
+					if (!files.length) {
+						return;
+					}
+					reader.readAsDataURL(files[0]);
+				},
 				// Pick a new active sketch for `app`
 				pushNewApp: function pushNewApp(app) {
+					// Click a hidden file-input if we're asked to upload a new file
+					if (app._selectedSketch === "_new_file_upload_") {
+						$('#sketchFilePicker').click();
+						return;
+					}
+
 					this.$http.post('/admin/apps/set-sketch', {
 						Name: app.Name,
 						ActiveSketch: app._selectedSketch
