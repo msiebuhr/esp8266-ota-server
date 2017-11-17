@@ -397,7 +397,7 @@ func (fs *FileSystem) GetAdminMux() http.Handler {
 		}
 
 		if data.Name == "" {
-			httperror.NewBadRequest("Missing parameter `Name` or `ActiveSketch`").Respond(w)
+			httperror.NewBadRequest("Missing parameter `Name`").Respond(w)
 			return
 		}
 
