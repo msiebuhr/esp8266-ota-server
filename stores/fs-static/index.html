@@ -64,10 +64,10 @@
 				-->
 						<td>
 							<form class="form-inline">
-								<select class="custom-select form-control" v-model="device.AppName">
+								<select class="custom-select form-control-sm" v-model="device.AppName">
 									<option v-bind:value="a.Name" v-for="a in apps">{{ a.Name }}</option>
 								</select>
-								<button type="button" class="btn btn-primary" v-on:click="deviceSetApp(device)" v-bind:disabled="false">Save changes</button>
+								<button type="button" class="btn btn-sm btn-primary" v-on:click="deviceSetApp(device)" v-bind:disabled="false">Save changes</button>
 							</form>
 						</td>
 					</tr>
