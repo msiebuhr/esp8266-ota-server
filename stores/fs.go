@@ -159,7 +159,7 @@ func (fs *FileSystem) UploadAppSketch(app, sketchName string, sketch []byte) err
 		return err
 	}
 
-	if !strings.HasSuffix(".bin", sketchName) {
+	if !strings.HasSuffix(sketchName, ".bin") {
 		sketchName = sketchName + ".bin"
 	}
 
