@@ -30,7 +30,7 @@
 					<img src="./favicon-inverted.svg" width="30" height="30" alt="">
 					<span class="navbar-brand mb-0 h2">ESP8266 Dashboard</span>
 				</a>
-			<button type="button" data-toggle="modal" class="btn btn-outline-light btn-sm pull-right" data-target="#newAppModal">Create new app</button>
+				<button type="button" data-toggle="modal" class="btn btn-outline-light btn-sm pull-right" data-target="#newAppModal">Create new app</button>
 			</span>
 		</nav>
 
@@ -40,8 +40,34 @@
 				<h1>{{ app.Name }}</h1>
 				<h3 class="card-subtitle mb-2 text-muted">{{ app.Sketches.length }} sketches, active is {{ app.ActiveSketch }}</h3>
 
+				<table class="table">
+					<thead>
+						<tr>
+							<th>Name / MAC</th>
+							<th>App</th>
+							<th>Last activity</th>
+							<th>Change app</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr v-for="device in devices" v-if="device.AppName == app.Name">
+							<td>{{ device.Name }}</td>
+							<td>{{ device.AppName }}</td>
+							<td>{{ device.LastActivity }}</td>
+							<td>
+								<form class="form-inline">
+									<select class="custom-select form-control-sm" v-model="device.AppName">
+										<option v-bind:value="a.Name" v-for="a in apps">{{ a.Name }}</option>
+									</select>
+									<button type="button" class="btn btn-sm btn-primary" v-on:click="deviceSetApp(device)" v-bind:disabled="false">Save changes</button>
+								</form>
+							</td>
+						</tr>
+					</tbody>
+				</table>
+
 				<form class="form-inline" action="/admin/apps/add-sketch">
-					<span class="col-1">Sketch</span>
+					<span class="col-1 offset-5">Sketch</span>
 					<select class="custom-select col-4" v-model="app._selectedSketch">
 						<option v-bind:value="s.Name" v-for="s in app.Sketches">{{ s.Name }} ({{ s.Size }}B / {{s.ModTime}})</option>
 						<option value="_new_file_upload_">Upload new image</option>
@@ -51,29 +77,6 @@
 						<button type="button" class="btn btn-primary" v-on:click="pushNewApp(app)" v-bind:disabled="app.ActiveSketch === app._selectedSketch">Save changes</button>
 					</div>
 				</form>
-				</p>
-
-				<table class="table">
-					<tr v-for="device in devices" v-if="device.AppName == app.Name">
-						<td>{{ device.Name }}</td>
-						<td>{{ device.AppName }}</td>
-						<td>{{ device.LastActivity }}</td>
-						<!--
-					<td v-for="value, key in device.Info">
-						<b>{{ key }}</b> {{value}}
-					</td>
-				-->
-						<td>
-							<form class="form-inline">
-								<select class="custom-select form-control-sm" v-model="device.AppName">
-									<option v-bind:value="a.Name" v-for="a in apps">{{ a.Name }}</option>
-								</select>
-								<button type="button" class="btn btn-sm btn-primary" v-on:click="deviceSetApp(device)" v-bind:disabled="false">Save changes</button>
-							</form>
-						</td>
-					</tr>
-				</table>
-
 			</div>
 
 			<!-- Modal -->
