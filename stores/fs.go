@@ -240,9 +240,10 @@ func (fs *FileSystem) GetAdminMux() http.Handler {
 	}
 
 	type device struct {
-		Name    string
-		Info    map[string]interface{}
-		AppName string
+		Name         string
+		Info         map[string]interface{}
+		LastActivity time.Time
+		AppName      string
 	}
 
 	// List devices
@@ -284,6 +285,17 @@ func (fs *FileSystem) GetAdminMux() http.Handler {
 			target, err := os.Readlink(filepath.Join(baseDir, "sketch"))
 			if err == nil {
 				data[i].AppName = filepath.Base(target)
+			}
+
+			// Read mtime on log to find last activity
+			f, err := os.Open(filepath.Join(baseDir, "request.log"))
+			if err == nil {
+				info, err := f.Stat()
+				if err == nil {
+					data[i].LastActivity = info.ModTime().UTC().Round(1 * time.Second)
+				}
+
+				f.Close()
 			}
 		}
 

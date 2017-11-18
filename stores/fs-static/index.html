@@ -57,6 +57,7 @@
 					<tr v-for="device in devices" v-if="device.AppName == app.Name">
 						<td>{{ device.Name }}</td>
 						<td>{{ device.AppName }}</td>
+						<td>{{ device.LastActivity }}</td>
 						<!--
 					<td v-for="value, key in device.Info">
 						<b>{{ key }}</b> {{value}}
