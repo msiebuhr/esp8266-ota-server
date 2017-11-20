@@ -38,8 +38,6 @@
 			<!-- Loop over apps -->
 			<div v-for="app in apps">
 				<h1>{{ app.Name }}</h1>
-				<h3 class="card-subtitle mb-2 text-muted">{{ app.Sketches.length }} sketches, active is {{ app.ActiveSketch }}</h3>
-
 				<table class="table">
 					<thead>
 						<tr>
@@ -56,26 +54,25 @@
 							<td>{{ device.LastActivity }}</td>
 							<td>
 								<form class="form-inline">
-									<select class="custom-select form-control-sm" v-model="device.AppName">
+									<select class="custom-select form-control-sm" v-model="device._changed.AppName">
 										<option v-bind:value="a.Name" v-for="a in apps">{{ a.Name }}</option>
 									</select>
-									<button type="button" class="btn btn-sm btn-primary" v-on:click="deviceSetApp(device)" v-bind:disabled="false">Save changes</button>
+									&nbsp;
+									<button type="button" class="btn btn-sm btn-primary" v-on:click="deviceSetApp(device, index)" v-bind:disabled="device._changed.AppName === device.AppName">Save changes</button>
 								</form>
 							</td>
 						</tr>
 					</tbody>
 				</table>
 
-				<form class="form-inline" action="/admin/apps/add-sketch">
-					<span class="col-1 offset-5">Sketch</span>
-					<select class="custom-select col-4" v-model="app._selectedSketch">
+				<form class="form-inline offset-5 col-7" action="/admin/apps/add-sketch">
+					Sketch &nbsp;
+					<select class="custom-select form-control-sm" v-model="app._selectedSketch">
 						<option v-bind:value="s.Name" v-for="s in app.Sketches">{{ s.Name }} ({{ s.Size }}B / {{s.ModTime}})</option>
 						<option value="_new_file_upload_">Upload new image</option>
 					</select>
-					<input id="sketchFilePicker" type="file" style="display:none" v-on:change="onFileChange(app, $event)" />
-					<div class="col-2">
-						<button type="button" class="btn btn-primary" v-on:click="pushNewApp(app)" v-bind:disabled="app.ActiveSketch === app._selectedSketch">Save changes</button>
-					</div>
+					<input id="sketchFilePicker" type="file" style="display:none" v-on:change="onFileChange(app, $event)" /> &nbsp;
+					<button type="button" class="btn btn-primary btn-sm" v-on:click="pushNewApp(app)" v-bind:disabled="app.ActiveSketch === app._selectedSketch">Save changes</button>
 				</form>
 			</div>
 
@@ -107,83 +104,87 @@
 
 
 		</main>
-		<!-- Optional JavaScript -->
-		<!-- jQuery first, then Popper.js, then Bootstrap JS -->
-		<script src="https://unpkg.com/vue@2.5.3/dist/vue.js"></script>
-		<script src="https://cdn.jsdelivr.net/npm/vue-resource@1.3.4"></script>
+	</div>
+	<!-- Optional JavaScript -->
+	<!-- jQuery first, then Popper.js, then Bootstrap JS -->
+	<script src="https://unpkg.com/vue@2.5.3/dist/vue.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/vue-resource@1.3.4"></script>
 
-		<script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN"
-		 crossorigin="anonymous"></script>
-		<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.3/umd/popper.min.js" integrity="sha384-vFJXuSJphROIrBnz7yo7oB41mKfc8JzQZiCq4NCceLEaO4IHwicKwpJf9c9IpFgh"
-		 crossorigin="anonymous"></script>
-		<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/js/bootstrap.min.js" integrity="sha384-alpBpkh1PFOepccYVYDB4do5UnbKysX5WZXm3XxPqe5iKTfUKjNkCk9SaVuEZflJ"
-		 crossorigin="anonymous"></script>
+	<script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN"
+	 crossorigin="anonymous"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.3/umd/popper.min.js" integrity="sha384-vFJXuSJphROIrBnz7yo7oB41mKfc8JzQZiCq4NCceLEaO4IHwicKwpJf9c9IpFgh"
+	 crossorigin="anonymous"></script>
+	<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta.2/js/bootstrap.min.js" integrity="sha384-alpBpkh1PFOepccYVYDB4do5UnbKysX5WZXm3XxPqe5iKTfUKjNkCk9SaVuEZflJ"
+	 crossorigin="anonymous"></script>
 
-		<script type="text/javascript">
-			var app = new Vue({
-				el: '#app',
-				data: {
-					//message: 'You loaded this page on ' + new Date().toLocaleString(),
-					devices: [],
-					apps: [],
-					newAppName: ""
-				},
-				methods: {
-					onFileChange(app, e) {
-						var that = this;
-						var reader = new FileReader();
-						reader.addEventListener("loadend", function () {
-							// reader.result contains the contents of blob as a typed array
-							that.$http.post('/admin/apps/add-sketch', {
-								Name: app.Name,
-								Sketches: [{
-									Data: reader.result.split(';base64,')[1],
-									Name: files[0].name
-								}]
-							})
-						});
-						var files = e.target.files || e.dataTransfer.files;
-						if (!files.length) {
-							return;
-						}
-						reader.readAsDataURL(files[0]);
-					},
-					// Pick a new active sketch for `app`
-					pushNewApp: function pushNewApp(app) {
-						// Click a hidden file-input if we're asked to upload a new file
-						if (app._selectedSketch === "_new_file_upload_") {
-							$('#sketchFilePicker').click();
-							return;
-						}
-
-						this.$http.post('/admin/apps/set-sketch', {
+	<script type="text/javascript">
+		var app = new Vue({
+			el: '#app',
+			data: {
+				//message: 'You loaded this page on ' + new Date().toLocaleString(),
+				devices: [],
+				apps: [],
+				newAppName: ""
+			},
+			methods: {
+				onFileChange(app, e) {
+					var that = this;
+					var reader = new FileReader();
+					reader.addEventListener("loadend", function () {
+						// reader.result contains the contents of blob as a typed array
+						that.$http.post('/admin/apps/add-sketch', {
 							Name: app.Name,
-							ActiveSketch: app._selectedSketch
-						}).then(function ok() {
-							app.ActiveSketch = app._selectedSketch;
-						}, function err(err) {
-							alert(err);
-						});
-					},
-
-					// Create a new app
-					newApp: function newApp(name) {
-						this.$http.post('/admin/apps/new', {
-							Name: name
+							Sketches: [{
+								Data: reader.result.split(';base64,')[1],
+								Name: files[0].name
+							}]
 						})
-						// TODO(mortens): reload
-					},
-
-					deviceSetApp: function deviceSetApp(device) {
-						this.$http.post('/admin/device/set-app', device)
+					});
+					var files = e.target.files || e.dataTransfer.files;
+					if (!files.length) {
+						return;
+					}
+					reader.readAsDataURL(files[0]);
+				},
+				// Pick a new active sketch for `app`
+				pushNewApp: function pushNewApp(app) {
+					// Click a hidden file-input if we're asked to upload a new file
+					if (app._selectedSketch === "_new_file_upload_") {
+						$('#sketchFilePicker').click();
+						return;
 					}
 
+					this.$http.post('/admin/apps/set-sketch', {
+						Name: app.Name,
+						ActiveSketch: app._selectedSketch
+					}).then(function ok() {
+						app.ActiveSketch = app._selectedSketch;
+					}, function err(err) {
+						alert(err);
+					});
 				},
-				// Hook when app starts up
-				created: function () {
+
+				// Create a new app
+				newApp: function newApp(name) {
+					this.$http.post('/admin/apps/new', {
+						Name: name
+					})
+					// TODO(mortens): reload
+				},
+
+				deviceSetApp: function deviceSetApp(device) {
+					this.$http.post('/admin/device/set-app', device);
+				}
+			},
+			// Hook when app starts up
+			created: function () {
 					// TODO: Reqwrite this as a function we can call to reload	
 					this.$http.get('/admin/devices').then(response => {
 						this.devices = response.body;
+						this.devices = response.body.map(device => {
+							device._changed = Object.assign({}, device);
+							return device;
+						});
 					});
 
 					this.$http.get('/admin/apps').then(response => {
@@ -194,9 +195,9 @@
 						});
 					});
 				}
-			});
-		</script>
-	</div>
+			}
+		});
+	</script>
 </body>
 
 </html>
