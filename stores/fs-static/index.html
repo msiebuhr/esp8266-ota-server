@@ -58,7 +58,7 @@
 										<option v-bind:value="a.Name" v-for="a in apps">{{ a.Name }}</option>
 									</select>
 									&nbsp;
-									<button type="button" class="btn btn-sm btn-primary" v-on:click="deviceSetApp(device, index)" v-bind:disabled="device._changed.AppName === device.AppName">Save changes</button>
+									<button type="button" class="btn btn-sm btn-primary" v-on:click="deviceSetApp(device)" v-bind:disabled="device._changed.AppName === device.AppName">Save changes</button>
 								</form>
 							</td>
 						</tr>
@@ -173,28 +173,38 @@
 				},
 
 				deviceSetApp: function deviceSetApp(device) {
-					this.$http.post('/admin/device/set-app', device);
+					return this.$http.post('/admin/device/set-app', device._changed).then(() => this.reload());
+				},
+
+				reload: function reload() {
+					var that = this;
+					return Promise.all([
+						// Get all devices
+						function getDevices() {
+							return that.$http.get('/admin/devices').then(response => {
+								that.devices = response.body.map(device => {
+									device._changed = Object.assign({}, device);
+									return device;
+								});
+							})
+						}(),
+
+						// Get all apps
+						function getApps() {
+							return that.$http.get('/admin/apps').then(response => {
+								that.apps = response.body.map((app) => {
+									// Shadow some properties for change-tracking
+									app._selectedSketch = app.ActiveSketch;
+									return app;
+								});
+							});
+						}()
+					]);
 				}
 			},
 			// Hook when app starts up
 			created: function () {
-					// TODO: Reqwrite this as a function we can call to reload	
-					this.$http.get('/admin/devices').then(response => {
-						this.devices = response.body;
-						this.devices = response.body.map(device => {
-							device._changed = Object.assign({}, device);
-							return device;
-						});
-					});
-
-					this.$http.get('/admin/apps').then(response => {
-						this.apps = response.body.map((app) => {
-							// Shadow some properties for change-tracking
-							app._selectedSketch = app.ActiveSketch;
-							return app;
-						});
-					});
-				}
+				return this.reload()
 			}
 		});
 	</script>
